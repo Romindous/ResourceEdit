@@ -6,14 +6,23 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.InputMismatchException;
+import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.Timer;
 
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.stream.JsonReader;
 
 public class Main {
 
@@ -21,32 +30,8 @@ public class Main {
 	
 	public static void main(final String[] args) {
 		tm = new Timer();
-
-		/*try {
-			final InputStreamReader isr = new InputStreamReader(new FileInputStream(new File("bone.json")));
-			final JSONObject jo = ((JSONObject) new JSONParser().parse(isr));
-			final JSONArray ovs = (JSONArray) jo.get("overrides");
-			for (final Object o : ovs) {
-				if (((JSONObject) ((JSONObject) o).get("predicate")).containsValue(111l)) {
-					System.out.println("[RE] >> This CustomModelData is already taken!");
-				}
-			}
-			final JSONObject ovo = new JSONObject();
-			final JSONObject prd = new JSONObject();
-			prd.put("custom_model_data", 121);
-			ovo.put("predicate", prd);
-			ovo.put("model", "gun/ak47.json".substring(0, "gun/ak47.json".lastIndexOf('.')));
-			ovs.add(ovo);
-			jo.replace("overrides", ovs);
-			
-			final OutputStreamWriter osr = new OutputStreamWriter(new FileOutputStream(new File("stne.json")));
-			osr.write(jo.toJSONString(). replace("\\", ""));
-			osr.close();
-		} catch (IOException | ParseException e) {
-			e.printStackTrace();
-		}*/
-		
 		final Scanner sc = new Scanner(System.in);
+		
 		final File dir;
 		System.out.println("[RE] >> Copy the RP directory from the explorer e.g. '(dir)/assets'...");
 		while (true) {
@@ -60,13 +45,14 @@ public class Main {
 			}
 		}
 		
+		System.out.println("[RE] >> Enter:\n(1) for <adding> a model\n(2) for <removing> a model\n(3) for <adding> a sound\nOr (4) to <remove> a sound\n(0) - exit");
 		l : while (true) {
 			//sc.next();
-			System.out.println("[RE] >> Enter:\n(1) for <adding> a model\n(2) for <removing> a model\n(3) for <adding> a sound\nOr (4) to <remove> a sound\n(0) - exit");
 			try {
-				switch (sc.nextInt()) {
+				final Scanner in = new Scanner(System.in);
+				switch (in.nextInt()) {
 				case 1:
-					addModel(dir, sc);
+					addModel(dir, in);
 					break;
 				case 2:
 					//unfinished
@@ -81,26 +67,25 @@ public class Main {
 					System.out.println("\n[RE] >> Exiting script, bye xD");
 					break l;
 				default:
+					in.close();
 					throw new InputMismatchException();
 				}
 			} catch (InputMismatchException e) {
-				System.out.println("\nPls enter a number 1-4...");
+				System.out.println("[ERROR] >> Pls enter a number 1-4...");
 				continue;
 			}
 		}
 		sc.close();
 		System.exit(0);
 	}
-
-	@SuppressWarnings("unchecked")
-	private static boolean addModel(final File rpMct, final Scanner sc) {
-		System.out.println("\n[RE] >> Enter the PNG model path...");
-		final File img = scanFile(sc, false, false, ".png");
-		System.out.println("[RE] >> And now the JSON model path...");
+	
+	private static boolean addModel(final File mcRoot, final Scanner sc) {
+		System.out.println("[RE] >> Enter the JSON model path...");
 		final File mdl = scanFile(sc, false, false, ".json");
-		System.out.println("[RE] >> What would you like the dir and model name to be?\nInclude the dir path e.g. 'guns\\ak47'...");
+		System.out.println("[RE] >> Choose a general directory for your model and textures.\nEnter the dir path e.g. 'guns/lmgs'...");
 		final String pth = sc.next();
-		System.out.println("[RE] >> The file paths will be added to \\models and \\");
+		final String mdlPth = pth + "/" + mdl.getName();
+		System.out.println("[INFO] >> The file paths will be added to //models and /textures");
 		System.out.println("\n[RE] >> What item should it be assigned to?");
 		final String itm = sc.next().toLowerCase().replace(' ', '_');
 		System.out.println("[RE] >> And to what CustomModelData (int)?");
@@ -110,50 +95,97 @@ public class Main {
 				cmd = sc.nextInt();
 				break;
 			} catch (InputMismatchException e) {
-				System.out.println("[RE] >> CustomModelData must be an int...");
+				System.out.println("[ERROR] >> CustomModelData must be an int...");
 			}
 		}
 		
-		if (new File(rpMct.getAbsolutePath() + "\\textures\\item\\" + pth).exists() || new File(rpMct.getAbsolutePath() + "\\models\\" + pth).exists()) {
+		final File nmdl = new File(mcRoot.getAbsolutePath() + "/models/" + pth + "/" + mdl.getName());
+		if (nmdl.exists()) {
 			System.out.println("The model under the dir of '" + pth + "' already exists!");
 			return false;
 		}
 		//new File(rpMct.getAbsolutePath() + "\\.json")
-		final File itmDt = new File(rpMct.getAbsolutePath() + "\\models\\item\\" + itm + ".json");
-		if (itmDt.exists()) {
-			try {
-				final InputStreamReader isr = new InputStreamReader(new FileInputStream(itmDt));
-				final JSONObject jo = ((JSONObject) new JSONParser().parse(isr));
-				final JSONArray ovs = (JSONArray) jo.get("overrides");
-				for (final Object o : ovs) {
-					if (((JSONObject) ((JSONObject) o).get("predicate")).containsValue(cmd)) {
-						System.out.println("[RE] >> This CustomModelData is already taken!");
+		final Gson gs = new GsonBuilder().setPrettyPrinting().create();
+		final File itmDt = new File(mcRoot.getAbsolutePath() + "/models/item/" + itm + ".json");
+		itmDt.getParentFile().mkdirs();
+		try {
+			if (itmDt.createNewFile()) {
+				crtNewJSONDt(itmDt, itm, cmd, mdlPth, gs);
+			} else {
+				final JsonObject jo = JsonParser.parseReader(new JsonReader(new InputStreamReader(new FileInputStream(itmDt)))).getAsJsonObject();
+				final JsonArray ja = jo.remove("overrides").getAsJsonArray();
+				for (final JsonElement o : ja) {
+					if (o.getAsJsonObject().getAsJsonObject("predicate").get("custom_model_data").getAsInt() == cmd) {
+						System.out.println("[ERROR] >> This CustomModelData is already taken!");
 						return false;
 					}
 				}
-				final JSONObject ovo = new JSONObject();
-				final JSONObject prd = new JSONObject();
-				prd.put("custom_model_data", cmd);
-				ovo.put("predicate", prd);
-				ovo.put("model", pth.substring(0, pth.lastIndexOf('.')));
-				ovs.add(ovo);
-				jo.replace("overrides", ovs);
-				
+				final JsonObject prd = new JsonObject();
+				prd.add("custom_model_data", new JsonPrimitive(cmd));
+				final JsonObject ovo = new JsonObject();
+				ovo.add("predicate", prd);
+				ovo.add("model", new JsonPrimitive(mdlPth.substring(0, mdlPth.lastIndexOf('.'))));
+				ja.add(ovo);
+				jo.add("overrides", ja);
+
 				final OutputStreamWriter osr = new OutputStreamWriter(new FileOutputStream(itmDt));
-				osr.write(jo.toJSONString(). replace("\\", ""));
+				osr.write(gs.toJson(jo));
 				osr.close();
-			} catch (IOException | ParseException e) {
-				e.printStackTrace();
 			}
-		} else {
-			crtNewJSONDt(itmDt, itm, cmd, pth);
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
-		//unfinished
+		
+		nmdl.getParentFile().mkdirs();
+		try {
+			nmdl.createNewFile();
+			Files.copy(mdl.toPath(), nmdl.toPath(), StandardCopyOption.REPLACE_EXISTING);
+			final JsonObject jo = JsonParser.parseReader(new JsonReader(new InputStreamReader(new FileInputStream(nmdl)))).getAsJsonObject();
+			final JsonObject smp = jo.remove("textures").getAsJsonObject();
+			for (final Entry<String, JsonElement> en : smp.entrySet()) {
+				System.out.println("[RE] >> Enter dir of a texture for '" + en.getKey() + "'...\nDir listed in file: " + en.getValue().getAsString());
+				final File txr = scanFile(sc, false, false, ".png");
+				final File nw = new File(mcRoot.getAbsolutePath() + "/textures/" + pth + "/" + txr.getName());
+				nw.getParentFile().mkdirs();
+				if (nw.createNewFile()) {
+					Files.copy(txr.toPath(), nw.toPath(), StandardCopyOption.REPLACE_EXISTING);
+				} else {
+					System.out.println("[INFO] >> The file '" + nw.getName() + "' already exists!");
+				}
+				en.setValue(new JsonPrimitive((pth + "/" + txr.getName()).substring(0, (pth + "/" + txr.getName()).lastIndexOf('.')).replace('\\', '/')));
+			}
+			System.out.println(smp);
+			jo.add("textures", smp);
+			
+			final OutputStreamWriter osr = new OutputStreamWriter(new FileOutputStream(nmdl));
+			osr.write(gs.toJson(jo));
+			osr.close();
+			return true;
+		} catch (JsonIOException | JsonSyntaxException | IOException ex) {
+			ex.printStackTrace();
+		}
+		//Files.move(Path., null, null)
 		return true;
 	}
 
-	private static void crtNewJSONDt(final File itmDt, final String itm, final int cmd, final String pth) {
-		
+	private static void crtNewJSONDt(final File itmDt, final String itm, final int cmd, final String pth, final Gson gs) throws IOException {
+		final JsonObject jo = new JsonObject();
+		jo.add("parent", new JsonPrimitive("item/handheld"));
+		final JsonObject tx = new JsonObject();
+		tx.add("layer0", new JsonPrimitive(itm));
+		jo.add("texture", tx);
+		final JsonArray ovs = new JsonArray(1);
+		final JsonObject prd = new JsonObject();
+		prd.add("custom_model_data", new JsonPrimitive(cmd));
+		final JsonObject ovo = new JsonObject();
+		ovo.add("predicate", prd);
+		ovo.add("model", new JsonPrimitive(pth.substring(0, pth.lastIndexOf('.'))));
+		ovs.add(ovo);
+		jo.add("overrides", ovs);
+
+		final OutputStreamWriter osr = new OutputStreamWriter(new FileOutputStream(itmDt));
+		osr.write(gs.toJson(jo));
+		osr.close();
 	}
 
 	private static boolean chckIfExist(final File pth, final boolean isDir, final boolean crtIfNot) {
@@ -184,13 +216,13 @@ public class Main {
 			final File fl = new File(sc.next());
 			if (chckIfExist(fl, isDir, crt)) {
 				if (fl.getName().endsWith(ext)) {
-					System.out.println("[RE] >> File " + fl.getName() + " is detecred");
+					System.out.println("[INFO] >> File " + fl.getName() + " is detected");
 					return fl;
 				} else {
-					System.out.println("[RE] >> The directory is not a '" + ext + "'! Try another");
+					System.out.println("[ERROR] >> The directory is not a '" + ext + "'! Try another");
 				}
 			} else {
-				System.out.println("[RE] >> The directory is not valid! Try another...");
+				System.out.println("[ERROR] >> The directory is not valid! Try another...");
 			}
 		}
 	}
