@@ -53,6 +53,7 @@ public class Main {
 				switch (in.nextInt()) {
 				case 1:
 					addModel(dir, in);
+					System.out.println("\n[RE] >> Enter:\n(1) for <adding> a model\n(2) for <removing> a model\n(3) for <adding> a sound\nOr (4) to <remove> a sound\n(0) - exit");
 					break;
 				case 2:
 					//unfinished
@@ -70,6 +71,7 @@ public class Main {
 					in.close();
 					throw new InputMismatchException();
 				}
+				continue;
 			} catch (InputMismatchException e) {
 				System.out.println("[ERROR] >> Pls enter a number 1-4...");
 				continue;
@@ -143,7 +145,7 @@ public class Main {
 			final JsonObject jo = JsonParser.parseReader(new JsonReader(new InputStreamReader(new FileInputStream(nmdl)))).getAsJsonObject();
 			final JsonObject smp = jo.remove("textures").getAsJsonObject();
 			for (final Entry<String, JsonElement> en : smp.entrySet()) {
-				System.out.println("[RE] >> Enter dir of a texture for '" + en.getKey() + "'...\nDir listed in file: " + en.getValue().getAsString());
+				System.out.println("\n[RE] >> Enter dir of a texture for '" + en.getKey() + "'...\nDir listed in file: " + en.getValue().getAsString());
 				final File txr = scanFile(sc, false, false, ".png");
 				final File nw = new File(mcRoot.getAbsolutePath() + "/textures/" + pth + "/" + txr.getName());
 				nw.getParentFile().mkdirs();
@@ -154,7 +156,6 @@ public class Main {
 				}
 				en.setValue(new JsonPrimitive((pth + "/" + txr.getName()).substring(0, (pth + "/" + txr.getName()).lastIndexOf('.')).replace('\\', '/')));
 			}
-			System.out.println(smp);
 			jo.add("textures", smp);
 			
 			final OutputStreamWriter osr = new OutputStreamWriter(new FileOutputStream(nmdl));
